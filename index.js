@@ -111,6 +111,20 @@ try {
     app.get('/manifest.json', (req, res) => {
         res.json(addonInterface.manifest);
     });
+    app.get('/resource/:resource/:type/:id.json', async (req, res) => {
+    const { resource, type, id } = req.params;
+    console.log(`Resource request: resource=${resource}, type=${type}, id=${id}`);
+
+    try {
+        const response = await addonInterface.get({ resource, type, id });
+        console.log('Handler response:', response);
+        res.json(response);
+    } catch (error) {
+        console.error('Error handling request:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
     app.get('/resource/:resource/:type/:id.json', (req, res) => {
         const { resource, type, id } = req.params;
