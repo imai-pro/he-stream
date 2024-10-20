@@ -2,9 +2,10 @@ const express = require('express');
 const axios = require('axios');
 const { addonBuilder } = require('stremio-addon-sdk');
 
-// API keys and constants
+// API keys and constants from environment variables
 const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY;
-const OPENSUBTITLES_API = 'https://api.opensubtitles.org/api/v1/subtitles';
+const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY; // New API key variable
+const OPENSUBTITLES_API = 'https://api.opensubtitles.com/api/v1/subtitles';
 
 // Stremio addon manifest
 const manifest = {
@@ -21,17 +22,24 @@ const manifest = {
 // Initialize addon builder
 const builder = new addonBuilder(manifest);
 
-// Define the subtitles handler
+// Subtitles handler
 builder.defineSubtitlesHandler(async ({ id }) => {
     try {
         console.log(`Fetching subtitles for ${id}...`);
 
-        // Step 1: Check for Hebrew subtitles
-        const hebrewResponse = await axios.get(`${OPENSUBTITLES_API}?imdb_id=${id}&languages=he`);
-        const hebrewSubtitles = hebrewResponse.data.data;
+        // Set headers for OpenSubtitles API
+        const headers = { 'Api-Key': OPENSUBTITLES_API_KEY };
 
+        // Step 1: Check for Hebrew subtitles
+        const hebrewResponse = await axios.get(
+            `${OPENSUBTITLES_API}?imdb_id=${id}&languages=he`,
+            { headers }
+        );
+        console.log('Hebrew subtitles response:', hebrewResponse.data);
+
+        const hebrewSubtitles = hebrewResponse.data.data;
         if (hebrewSubtitles && hebrewSubtitles.length > 0) {
-            console.log('Hebrew subtitles found.');
+            console.log('Returning Hebrew subtitles.');
             return {
                 subtitles: hebrewSubtitles.map(sub => ({
                     id: sub.attributes.url,
@@ -44,15 +52,24 @@ builder.defineSubtitlesHandler(async ({ id }) => {
 
         console.log('No Hebrew subtitles found. Fetching English subtitles.');
 
-        const englishResponse = await axios.get(`${OPENSUBTITLES_API}?imdb_id=${id}&languages=en`);
-        const englishSubtitles = englishResponse.data.data[0];
+        // Step 2: Fetch English subtitles if Hebrew ones are not available
+        const englishResponse = await axios.get(
+            `${OPENSUBTITLES_API}?imdb_id=${id}&languages=en`,
+            { headers }
+        );
+        console.log('English subtitles response:', englishResponse.data);
 
+        const englishSubtitles = englishResponse.data.data[0];
         if (!englishSubtitles) throw new Error('No English subtitles found.');
 
-        const subtitleContent = await axios.get(englishSubtitles.attributes.url, { responseType: 'text' });
+        const subtitleContent = await axios.get(englishSubtitles.attributes.url, {
+            responseType: 'text',
+        });
+        console.log('Subtitle content fetched successfully.');
 
-        console.log('Translating English subtitles to Hebrew...');
+        // Step 3: Translate the English subtitles to Hebrew
         const translated = await translateText(subtitleContent.data, 'en', 'he');
+        console.log('Translation complete.');
 
         return {
             subtitles: [
@@ -65,7 +82,7 @@ builder.defineSubtitlesHandler(async ({ id }) => {
             ],
         };
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in subtitles handler:', error);
         return { subtitles: [] };
     }
 });
