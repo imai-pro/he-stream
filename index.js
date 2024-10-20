@@ -16,6 +16,7 @@ const manifest = {
     resources: ['subtitles'],
     types: ['movie', 'series'],
     idPrefixes: ['tt'],
+    catalogs: [],
 };
 
 // Initialize the addon builder
