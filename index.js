@@ -5,7 +5,7 @@ const { addonBuilder } = require('stremio-addon-sdk');
 const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY;
 const OPENSUBTITLES_API = 'https://api.opensubtitles.org/api/v1/subtitles';
 
-const builder = new addonBuilder({
+const manifest = {
     id: 'org.stremio.translated-subtitles',
     version: '1.1.0',
     name: 'Hebrew Subtitles Translator (EN to HE)',
@@ -13,8 +13,10 @@ const builder = new addonBuilder({
     resources: ['subtitles'],
     types: ['movie', 'series'],
     idPrefixes: ['tt'],
-    catalogs: [],  // Empty array if you don't use catalogs
-});
+    catalogs: [],
+};
+
+const builder = new addonBuilder(manifest);
 
 // Subtitles handler
 builder.defineSubtitlesHandler(async ({ id, type, extra }) => {
