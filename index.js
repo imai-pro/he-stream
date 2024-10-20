@@ -21,12 +21,12 @@ const manifest = {
 // Initialize addon builder
 const builder = new addonBuilder(manifest);
 
-// Subtitles handler
+// Define the subtitles handler
 builder.defineSubtitlesHandler(async ({ id }) => {
     try {
         console.log(`Fetching subtitles for ${id}...`);
 
-        // Check for Hebrew subtitles
+        // Step 1: Check for Hebrew subtitles
         const hebrewResponse = await axios.get(`${OPENSUBTITLES_API}?imdb_id=${id}&languages=he`);
         const hebrewSubtitles = hebrewResponse.data.data;
 
@@ -89,13 +89,20 @@ const port = process.env.PORT || 7000;
 
 try {
     const addonInterface = builder.getInterface();
-    if (typeof addonInterface !== 'object' || !addonInterface.middleware) {
-        throw new Error('Invalid middleware function from builder.getInterface().');
-    }
 
-    // Correctly use the middleware from Stremio SDK
-    app.use(addonInterface.middleware());
+    // Serve manifest.json and other routes properly
+    app.get('/manifest.json', (req, res) => {
+        res.json(addonInterface.manifest);
+    });
 
+    app.get('/resource/:resource/:type/:id.json', (req, res) => {
+        const { resource, type, id } = req.params;
+        addonInterface.get({ resource, type, id })
+            .then(response => res.json(response))
+            .catch(error => res.status(500).json({ error: error.message }));
+    });
+
+    // Start the server
     app.listen(port, () => console.log(`Addon running on http://localhost:${port}`));
 } catch (error) {
     console.error('Failed to start the server:', error);
