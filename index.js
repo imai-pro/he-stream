@@ -7,7 +7,7 @@ const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY;
 const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY;
 const OPENSUBTITLES_API = 'https://api.opensubtitles.com/api/v1/subtitles';
 
-// Stremio addon manifest
+// Define Stremio addon manifest
 const manifest = {
     id: 'org.stremio.translated-subtitles',
     version: '1.1.0',
@@ -22,7 +22,7 @@ const manifest = {
 // Initialize the addon builder
 const builder = new addonBuilder(manifest);
 
-// Subtitles handler
+// Define the subtitles handler
 builder.defineSubtitlesHandler(async ({ type, id }) => {
     console.log(`Handling subtitles request for type=${type}, id=${id}`);
 
@@ -51,7 +51,7 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
 
         console.log('No Hebrew subtitles found. Fetching English subtitles.');
 
-        // Step 2: If no Hebrew, fetch English subtitles
+        // Step 2: Fetch English subtitles if Hebrew ones are unavailable
         const englishResponse = await axios.get(
             `${OPENSUBTITLES_API}?imdb_id=${id}&languages=en`,
             { headers }
@@ -65,9 +65,9 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
             englishSubtitles.attributes.url,
             { responseType: 'text' }
         );
-        console.log('English subtitle content fetched.');
+        console.log('Fetched English subtitle content.');
 
-        // Step 3: Translate English subtitles to Hebrew
+        // Step 3: Translate the English subtitles to Hebrew
         const translated = await translateText(subtitleContent.data, 'en', 'he');
         console.log('Translation complete.');
 
@@ -87,7 +87,7 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
     }
 });
 
-// Google Translate API helper function
+// Helper function for Google Translate API
 async function translateText(text, sourceLang, targetLang) {
     const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
     const response = await axios.post(url, {
@@ -100,7 +100,7 @@ async function translateText(text, sourceLang, targetLang) {
     return response.data.data.translations[0].translatedText;
 }
 
-// Set up Express server and integrate the Stremio addon
+// Set up Express server and integrate Stremio addon
 const app = express();
 const port = process.env.PORT || 7000;
 
@@ -112,17 +112,23 @@ try {
         res.json(addonInterface.manifest);
     });
 
-    // Serve resource requests
+    // Serve resource requests dynamically
     app.get('/resource/:resource/:type/:id.json', async (req, res) => {
         const { resource, type, id } = req.params;
-        console.log(`Received request for ${resource}, type=${type}, id=${id}`);
+        console.log(`Received request for resource=${resource}, type=${type}, id=${id}`);
 
         if (resource !== 'subtitles') {
+            console.log('Invalid resource type');
             return res.status(404).json({ error: 'No handler for this resource.' });
         }
 
         try {
-            const response = await addonInterface.get({ resource, type, id });
+            const response = await builder.getInterface().get({
+                resource: 'subtitles',
+                type,
+                id,
+            });
+            console.log('Handler response:', response);
             res.json(response);
         } catch (error) {
             console.error('Error handling request:', error);
@@ -131,7 +137,7 @@ try {
     });
 
     // Start the server
-    app.listen(port, () => console.log(`Addon running on http://localhost:${port}`));
+    app.listen(port, () => console.log(`Addon running at http://localhost:${port}`));
 } catch (error) {
     console.error('Failed to start the server:', error);
 }
