@@ -2,9 +2,9 @@ const express = require('express');
 const axios = require('axios');
 const { addonBuilder } = require('stremio-addon-sdk');
 
-// API keys and constants from environment variables
+// Load environment variables
 const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY;
-const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY; // New API key variable
+const OPENSUBTITLES_API_KEY = process.env.OPENSUBTITLES_API_KEY;
 const OPENSUBTITLES_API = 'https://api.opensubtitles.com/api/v1/subtitles';
 
 // Stremio addon manifest
@@ -19,18 +19,18 @@ const manifest = {
     catalogs: [],
 };
 
-// Initialize addon builder
+// Initialize the addon builder
 const builder = new addonBuilder(manifest);
 
 // Subtitles handler
-builder.defineSubtitlesHandler(async ({ id }) => {
-    try {
-        console.log(`Fetching subtitles for ${id}...`);
+builder.defineSubtitlesHandler(async ({ type, id }) => {
+    console.log(`Handling subtitles request for type=${type}, id=${id}`);
 
+    try {
         // Set headers for OpenSubtitles API
         const headers = { 'Api-Key': OPENSUBTITLES_API_KEY };
 
-        // Step 1: Check for Hebrew subtitles
+        // Step 1: Try to get Hebrew subtitles
         const hebrewResponse = await axios.get(
             `${OPENSUBTITLES_API}?imdb_id=${id}&languages=he`,
             { headers }
@@ -39,7 +39,6 @@ builder.defineSubtitlesHandler(async ({ id }) => {
 
         const hebrewSubtitles = hebrewResponse.data.data;
         if (hebrewSubtitles && hebrewSubtitles.length > 0) {
-            console.log('Returning Hebrew subtitles.');
             return {
                 subtitles: hebrewSubtitles.map(sub => ({
                     id: sub.attributes.url,
@@ -52,7 +51,7 @@ builder.defineSubtitlesHandler(async ({ id }) => {
 
         console.log('No Hebrew subtitles found. Fetching English subtitles.');
 
-        // Step 2: Fetch English subtitles if Hebrew ones are not available
+        // Step 2: If no Hebrew, fetch English subtitles
         const englishResponse = await axios.get(
             `${OPENSUBTITLES_API}?imdb_id=${id}&languages=en`,
             { headers }
@@ -62,12 +61,13 @@ builder.defineSubtitlesHandler(async ({ id }) => {
         const englishSubtitles = englishResponse.data.data[0];
         if (!englishSubtitles) throw new Error('No English subtitles found.');
 
-        const subtitleContent = await axios.get(englishSubtitles.attributes.url, {
-            responseType: 'text',
-        });
-        console.log('Subtitle content fetched successfully.');
+        const subtitleContent = await axios.get(
+            englishSubtitles.attributes.url,
+            { responseType: 'text' }
+        );
+        console.log('English subtitle content fetched.');
 
-        // Step 3: Translate the English subtitles to Hebrew
+        // Step 3: Translate English subtitles to Hebrew
         const translated = await translateText(subtitleContent.data, 'en', 'he');
         console.log('Translation complete.');
 
@@ -87,7 +87,7 @@ builder.defineSubtitlesHandler(async ({ id }) => {
     }
 });
 
-// Helper function to translate text using Google Translate API
+// Google Translate API helper function
 async function translateText(text, sourceLang, targetLang) {
     const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
     const response = await axios.post(url, {
@@ -107,30 +107,27 @@ const port = process.env.PORT || 7000;
 try {
     const addonInterface = builder.getInterface();
 
-    // Serve manifest.json and other routes properly
+    // Serve manifest.json
     app.get('/manifest.json', (req, res) => {
         res.json(addonInterface.manifest);
     });
+
+    // Serve resource requests
     app.get('/resource/:resource/:type/:id.json', async (req, res) => {
-    const { resource, type, id } = req.params;
-    console.log(`Resource request: resource=${resource}, type=${type}, id=${id}`);
-
-    try {
-        const response = await addonInterface.get({ resource, type, id });
-        console.log('Handler response:', response);
-        res.json(response);
-    } catch (error) {
-        console.error('Error handling request:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-
-    app.get('/resource/:resource/:type/:id.json', (req, res) => {
         const { resource, type, id } = req.params;
-        addonInterface.get({ resource, type, id })
-            .then(response => res.json(response))
-            .catch(error => res.status(500).json({ error: error.message }));
+        console.log(`Received request for ${resource}, type=${type}, id=${id}`);
+
+        if (resource !== 'subtitles') {
+            return res.status(404).json({ error: 'No handler for this resource.' });
+        }
+
+        try {
+            const response = await addonInterface.get({ resource, type, id });
+            res.json(response);
+        } catch (error) {
+            console.error('Error handling request:', error);
+            res.status(500).json({ error: error.message });
+        }
     });
 
     // Start the server
