@@ -18,6 +18,7 @@ const manifest = {
 
 const builder = new addonBuilder(manifest);
 
+
 // Subtitles handler
 builder.defineSubtitlesHandler(async ({ id, type, extra }) => {
     try {
@@ -100,7 +101,8 @@ async function translateText(text, sourceLang, targetLang) {
 // Start the addon server
 const app = express();
 const port = process.env.PORT || 7000;
-app.use(builder.getInterface());
+const addonInterface = builder.getInterface();
+app.use(addonInterface);
 app.listen(port, () =>
     console.log(`Addon running at http://localhost:${port}`)
 );
