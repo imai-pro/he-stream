@@ -13,6 +13,7 @@ const builder = new addonBuilder({
     resources: ['subtitles'],
     types: ['movie', 'series'],
     idPrefixes: ['tt'],
+    catalogs: [],  // Empty array if you don't use catalogs
 });
 
 // Subtitles handler
