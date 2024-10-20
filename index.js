@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const { addonBuilder } = require('stremio-addon-sdk');
 
-const GOOGLE_TRANSLATE_API_KEY = 'YOUR_GOOGLE_TRANSLATE_API_KEY';
+const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY;
 const OPENSUBTITLES_API = 'https://api.opensubtitles.org/api/v1/subtitles';
 
 const builder = new addonBuilder({
