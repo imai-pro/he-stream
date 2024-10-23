@@ -22,14 +22,14 @@ const manifest = {
 // Initialize the addon builder
 const builder = new addonBuilder(manifest);
 
-// Define the subtitles handler for Stremio
+// Define the subtitles handler
 builder.defineSubtitlesHandler(async ({ type, id }) => {
     console.log(`Handling subtitles request for type=${type}, id=${id}`);
 
     try {
         const headers = { 'Api-Key': OPENSUBTITLES_API_KEY };
 
-        // Check for Hebrew subtitles
+        // Step 1: Check for Hebrew subtitles
         const hebrewResponse = await axios.get(
             `${OPENSUBTITLES_API}?imdb_id=${id}&languages=he`,
             { headers }
@@ -48,7 +48,7 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
             };
         }
 
-        // Fetch English subtitles if no Hebrew found
+        // Step 2: Fetch and translate English subtitles
         console.log('Fetching English subtitles...');
         const englishResponse = await axios.get(
             `${OPENSUBTITLES_API}?imdb_id=${id}&languages=en`,
@@ -63,7 +63,7 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
             { responseType: 'text' }
         );
 
-        console.log('Translating English subtitles to Hebrew...');
+        console.log('Translating English subtitles...');
         const translated = await translateText(subtitleContent.data, 'en', 'he');
 
         return {
@@ -77,12 +77,12 @@ builder.defineSubtitlesHandler(async ({ type, id }) => {
             ],
         };
     } catch (error) {
-        console.error('Error in subtitles handler:', error);
-        return { subtitles: [] };
+        console.error(`Error in subtitles handler for type=${type}, id=${id}:`, error.message);
+        throw new Error(`Failed to process subtitles request for ${id}: ${error.message}`);
     }
 });
 
-// Google Translate API helper function
+// Helper function for Google Translate API
 async function translateText(text, sourceLang, targetLang) {
     const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_TRANSLATE_API_KEY}`;
     const response = await axios.post(url, {
@@ -95,7 +95,7 @@ async function translateText(text, sourceLang, targetLang) {
     return response.data.data.translations[0].translatedText;
 }
 
-// Set up the Express server and bind it to Stremio addon
+// Set up the Express server
 const app = express();
 const port = process.env.PORT || 7000;
 
@@ -106,7 +106,7 @@ app.get('/manifest.json', (req, res) => {
     res.json(addonInterface.manifest);
 });
 
-// Route for resource requests
+// Handle resource requests with detailed error handling
 app.get('/resource/:resource/:type/:id.json', async (req, res) => {
     const { resource, type, id } = req.params;
     console.log(`Received request for resource=${resource}, type=${type}, id=${id}`);
@@ -115,8 +115,18 @@ app.get('/resource/:resource/:type/:id.json', async (req, res) => {
         const response = await addonInterface.get({ resource, type, id });
         res.json(response);
     } catch (error) {
-        console.error('Error processing request:', error);
-        res.status(500).json({ error: error.message });
+        console.error(
+            `Error processing request for resource=${resource}, type=${type}, id=${id}:`,
+            error.message,
+            error
+        );
+
+        // Return a detailed error response
+        res.status(500).json({
+            error: `Failed to handle request. Resource=${resource}, Type=${type}, ID=${id}`,
+            message: error.message,
+            stack: error.stack,
+        });
     }
 });
 
